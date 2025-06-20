@@ -80,16 +80,20 @@ const wss = new WebSocket.Server({ server });
 
 const ALPACA_NEWS_WS_URL = 'wss://stream.data.alpaca.markets/v1beta1/news';
 const ALPACA_STOCK_WS_URL = 'wss://stream.data.alpaca.markets/v2/iex';
+const ALPACA_CRYPTO_WS_URL = 'wss://stream.data.alpaca.markets/v1beta3/crypto/us';
 
 let alpacaNewsWs = null;
 let alpacaStockWs = null;
+let alpacaCryptoWs = null;
 let newsBuffer = [];
 const MAX_BUFFER_SIZE = 100;
 let currentApiKey = null;
 let currentApiSecret = null;
 let isAlpacaNewsConnected = false;
 let isAlpacaStockConnected = false;
+let isAlpacaCryptoConnected = false;
 let subscribedSymbols = new Set();
+let subscribedCryptos = new Set();
 
 function connectToAlpaca(apiKey, apiSecret) {
     if (alpacaNewsWs) {
@@ -98,14 +102,19 @@ function connectToAlpaca(apiKey, apiSecret) {
     if (alpacaStockWs) {
         alpacaStockWs.close();
     }
+    if (alpacaCryptoWs) {
+        alpacaCryptoWs.close();
+    }
     
     currentApiKey = apiKey;
     currentApiSecret = apiSecret;
     isAlpacaNewsConnected = false;
     isAlpacaStockConnected = false;
+    isAlpacaCryptoConnected = false;
     
     connectToAlpacaNews(apiKey, apiSecret);
     connectToAlpacaStocks(apiKey, apiSecret);
+    connectToAlpacaCrypto(apiKey, apiSecret);
 }
 
 function connectToAlpacaNews(apiKey, apiSecret) {
@@ -294,6 +303,114 @@ function subscribeToStockSymbols(symbols) {
     });
 }
 
+function connectToAlpacaCrypto(apiKey, apiSecret) {
+    alpacaCryptoWs = new WebSocket(ALPACA_CRYPTO_WS_URL);
+
+    alpacaCryptoWs.on('open', () => {
+        console.log('Connected to Alpaca crypto data feed');
+        
+        const authMessage = JSON.stringify({
+            action: 'auth',
+            key: apiKey,
+            secret: apiSecret
+        });
+        alpacaCryptoWs.send(authMessage);
+    });
+
+    alpacaCryptoWs.on('message', (data) => {
+        try {
+            const messages = JSON.parse(data);
+            
+            for (const message of messages) {
+                if (message.T === 'success' && message.msg === 'authenticated') {
+                    console.log('Authenticated with Alpaca Crypto Data');
+                    isAlpacaCryptoConnected = true;
+                } else if (message.T === 'subscription') {
+                    console.log('Crypto subscription confirmed:', message);
+                } else if (message.T === 't') {
+                    // Crypto trade update
+                    console.log(`Crypto trade update for ${message.S}: $${message.p}`);
+                    broadcast({
+                        type: 'crypto_trade',
+                        data: {
+                            symbol: message.S,
+                            price: message.p,
+                            size: message.s,
+                            timestamp: message.t
+                        }
+                    });
+                } else if (message.T === 'q') {
+                    // Crypto quote update
+                    console.log(`Crypto quote update for ${message.S}: Bid $${message.bp} Ask $${message.ap}`);
+                    broadcast({
+                        type: 'crypto_quote',
+                        data: {
+                            symbol: message.S,
+                            bidPrice: message.bp,
+                            bidSize: message.bs,
+                            askPrice: message.ap,
+                            askSize: message.as,
+                            timestamp: message.t
+                        }
+                    });
+                } else if (message.T === 'b') {
+                    // Crypto bar (OHLCV) update
+                    broadcast({
+                        type: 'crypto_bar',
+                        data: {
+                            symbol: message.S,
+                            open: message.o,
+                            high: message.h,
+                            low: message.l,
+                            close: message.c,
+                            volume: message.v,
+                            timestamp: message.t
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error parsing Alpaca crypto message:', error);
+        }
+    });
+
+    alpacaCryptoWs.on('error', (error) => {
+        console.error('Alpaca Crypto WebSocket error:', error);
+        isAlpacaCryptoConnected = false;
+    });
+
+    alpacaCryptoWs.on('close', () => {
+        console.log('Alpaca Crypto connection closed');
+        isAlpacaCryptoConnected = false;
+        alpacaCryptoWs = null;
+    });
+}
+
+function subscribeToCryptos(symbols) {
+    if (!alpacaCryptoWs || !isAlpacaCryptoConnected) {
+        console.log('Crypto WebSocket not connected, cannot subscribe to symbols');
+        return;
+    }
+    
+    const newCryptos = symbols.filter(s => !subscribedCryptos.has(s));
+    if (newCryptos.length === 0) return;
+    
+    newCryptos.forEach(s => subscribedCryptos.add(s));
+    
+    console.log('Subscribing to crypto data for:', newCryptos);
+    alpacaCryptoWs.send(JSON.stringify({
+        action: 'subscribe',
+        trades: newCryptos,
+        quotes: newCryptos,
+        bars: newCryptos
+    }));
+    
+    broadcast({
+        type: 'cryptos_added',
+        symbols: newCryptos
+    });
+}
+
 function disconnectFromAlpaca() {
     if (alpacaNewsWs) {
         alpacaNewsWs.close();
@@ -305,9 +422,15 @@ function disconnectFromAlpaca() {
         alpacaStockWs = null;
         isAlpacaStockConnected = false;
     }
+    if (alpacaCryptoWs) {
+        alpacaCryptoWs.close();
+        alpacaCryptoWs = null;
+        isAlpacaCryptoConnected = false;
+    }
     currentApiKey = null;
     currentApiSecret = null;
     subscribedSymbols.clear();
+    subscribedCryptos.clear();
 }
 
 function broadcast(message) {
@@ -396,6 +519,21 @@ wss.on('connection', (ws) => {
                     console.log(`Adding ${symbol} to watchlist`);
                     subscribeToStockSymbols([symbol]);
                 }
+            } else if (message.type === 'subscribe_top10_crypto') {
+                console.log('Subscribing to top 10 cryptocurrencies');
+                const top10Cryptos = [
+                    'BTC/USD',   // Bitcoin
+                    'ETH/USD',   // Ethereum
+                    'BNB/USD',   // Binance Coin
+                    'XRP/USD',   // Ripple
+                    'SOL/USD',   // Solana
+                    'ADA/USD',   // Cardano
+                    'AVAX/USD',  // Avalanche
+                    'DOGE/USD',  // Dogecoin
+                    'DOT/USD',   // Polkadot
+                    'MATIC/USD'  // Polygon
+                ];
+                subscribeToCryptos(top10Cryptos);
             }
         } catch (error) {
             console.error('Error handling client message:', error);

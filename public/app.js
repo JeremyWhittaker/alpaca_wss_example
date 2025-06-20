@@ -16,6 +16,10 @@ const stocksGrid = document.getElementById('stocksGrid');
 const stocksCount = document.getElementById('stocksCount');
 const clearStocksBtn = document.getElementById('clearStocksBtn');
 const autoConnectCheckbox = document.getElementById('autoConnect');
+const cryptoGrid = document.getElementById('cryptoGrid');
+const cryptoCount = document.getElementById('cryptoCount');
+const subscribeTop10Btn = document.getElementById('subscribeTop10Btn');
+const clearCryptoBtn = document.getElementById('clearCryptoBtn');
 
 let ws = null;
 let reconnectInterval = null;
@@ -25,6 +29,8 @@ let shouldReconnect = false;
 let newsCounter = 0;
 let stockData = new Map();
 let stockElements = new Map();
+let cryptoData = new Map();
+let cryptoElements = new Map();
 
 function debugLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
@@ -376,6 +382,24 @@ function connectWebSocket() {
             } else if (message.type === 'stock_quote') {
                 const { symbol, bidPrice, askPrice, timestamp } = message.data;
                 updateStockDisplay(symbol, { bidPrice, askPrice, timestamp });
+            } else if (message.type === 'cryptos_added') {
+                debugLog(`Added cryptos to tracking: ${message.symbols.join(', ')}`, 'info');
+                message.symbols.forEach(symbol => {
+                    if (!cryptoData.has(symbol)) {
+                        cryptoData.set(symbol, {});
+                        updateCryptoDisplay(symbol, {});
+                    }
+                });
+            } else if (message.type === 'crypto_trade') {
+                const { symbol, price, size, timestamp } = message.data;
+                debugLog(`Crypto trade: ${symbol} @ $${price}`, 'info');
+                updateCryptoDisplay(symbol, { price, timestamp });
+            } else if (message.type === 'crypto_quote') {
+                const { symbol, bidPrice, askPrice, timestamp } = message.data;
+                updateCryptoDisplay(symbol, { bidPrice, askPrice, timestamp });
+            } else if (message.type === 'crypto_bar') {
+                const { symbol, open, high, low, close, volume, timestamp } = message.data;
+                updateCryptoDisplay(symbol, { price: close, high, low, volume, timestamp });
             }
         } catch (error) {
             console.error('Error parsing message:', error);
@@ -527,12 +551,152 @@ async function loadSavedCredentials() {
     }
 }
 
+function updateCryptoCounter() {
+    const count = cryptoData.size;
+    cryptoCount.textContent = `${count} crypto${count !== 1 ? 's' : ''} tracked`;
+}
+
+function createCryptoElement(symbol) {
+    const card = document.createElement('div');
+    card.className = 'crypto-card';
+    
+    const displaySymbol = symbol.replace('/USD', '');
+    const cryptoNames = {
+        'BTC': 'Bitcoin',
+        'ETH': 'Ethereum',
+        'BNB': 'Binance Coin',
+        'XRP': 'Ripple',
+        'SOL': 'Solana',
+        'ADA': 'Cardano',
+        'AVAX': 'Avalanche',
+        'DOGE': 'Dogecoin',
+        'DOT': 'Polkadot',
+        'MATIC': 'Polygon'
+    };
+    
+    card.innerHTML = `
+        <div class="crypto-header-row">
+            <div>
+                <div class="crypto-symbol">${displaySymbol}</div>
+                <div class="crypto-name">${cryptoNames[displaySymbol] || displaySymbol}</div>
+            </div>
+        </div>
+        <div class="crypto-price unchanged">--</div>
+        <div class="crypto-change-24h">--</div>
+        <div class="crypto-stats">
+            <div class="crypto-stat">
+                <span class="crypto-stat-label">24h High</span>
+                <span class="crypto-stat-value" data-high>--</span>
+            </div>
+            <div class="crypto-stat">
+                <span class="crypto-stat-label">24h Low</span>
+                <span class="crypto-stat-value" data-low>--</span>
+            </div>
+            <div class="crypto-stat">
+                <span class="crypto-stat-label">Volume</span>
+                <span class="crypto-stat-value" data-volume>--</span>
+            </div>
+            <div class="crypto-stat">
+                <span class="crypto-stat-label">Bid/Ask</span>
+                <span class="crypto-stat-value" data-spread>--</span>
+            </div>
+        </div>
+        <div class="stock-timestamp">--</div>
+    `;
+    return card;
+}
+
+function updateCryptoDisplay(symbol, data) {
+    let element = cryptoElements.get(symbol);
+    
+    if (!element) {
+        const placeholder = cryptoGrid.querySelector('.crypto-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+        
+        element = createCryptoElement(symbol);
+        cryptoElements.set(symbol, element);
+        cryptoGrid.appendChild(element);
+    }
+    
+    const priceEl = element.querySelector('.crypto-price');
+    const changeEl = element.querySelector('.crypto-change-24h');
+    const highEl = element.querySelector('[data-high]');
+    const lowEl = element.querySelector('[data-low]');
+    const volumeEl = element.querySelector('[data-volume]');
+    const spreadEl = element.querySelector('[data-spread]');
+    const timestampEl = element.querySelector('.stock-timestamp');
+    
+    if (data.price !== undefined) {
+        const prevPrice = cryptoData.get(symbol)?.price || data.price;
+        priceEl.textContent = `$${data.price.toFixed(data.price > 100 ? 2 : 4)}`;
+        
+        if (data.price > prevPrice) {
+            priceEl.className = 'crypto-price up';
+        } else if (data.price < prevPrice) {
+            priceEl.className = 'crypto-price down';
+        } else {
+            priceEl.className = 'crypto-price unchanged';
+        }
+        
+        const change = data.price - prevPrice;
+        const changePercent = prevPrice ? ((change / prevPrice) * 100).toFixed(2) : 0;
+        changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(4)} (${changePercent}%)`;
+        changeEl.style.color = change >= 0 ? '#4ade80' : '#ef4444';
+    }
+    
+    if (data.high !== undefined) {
+        highEl.textContent = `$${data.high.toFixed(data.high > 100 ? 2 : 4)}`;
+    }
+    
+    if (data.low !== undefined) {
+        lowEl.textContent = `$${data.low.toFixed(data.low > 100 ? 2 : 4)}`;
+    }
+    
+    if (data.volume !== undefined) {
+        const vol = data.volume > 1000000 ? `${(data.volume / 1000000).toFixed(2)}M` : data.volume.toLocaleString();
+        volumeEl.textContent = vol;
+    }
+    
+    if (data.bidPrice !== undefined && data.askPrice !== undefined) {
+        spreadEl.textContent = `$${data.bidPrice.toFixed(4)} / $${data.askPrice.toFixed(4)}`;
+    }
+    
+    if (data.timestamp) {
+        const time = new Date(data.timestamp).toLocaleTimeString();
+        timestampEl.textContent = `Updated: ${time}`;
+    }
+    
+    cryptoData.set(symbol, { ...cryptoData.get(symbol), ...data });
+    updateCryptoCounter();
+}
+
 clearStocksBtn.addEventListener('click', () => {
     stockData.clear();
     stockElements.clear();
     stocksGrid.innerHTML = '<div class="stocks-placeholder"><p>Stock symbols from news will automatically appear here with real-time price updates</p></div>';
     updateStocksCounter();
     debugLog('Cleared all stock data', 'info');
+});
+
+subscribeTop10Btn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN && isConnectedToAlpaca) {
+        debugLog('Subscribing to top 10 cryptocurrencies...', 'info');
+        ws.send(JSON.stringify({ type: 'subscribe_top10_crypto' }));
+        subscribeTop10Btn.disabled = true;
+    } else {
+        showMessage('Please connect to Alpaca first', 'error');
+    }
+});
+
+clearCryptoBtn.addEventListener('click', () => {
+    cryptoData.clear();
+    cryptoElements.clear();
+    cryptoGrid.innerHTML = '<div class="crypto-placeholder"><p>Click "Subscribe to Top 10 Crypto" to start tracking major cryptocurrencies by market cap</p><p class="crypto-note">Includes: BTC, ETH, BNB, XRP, SOL, ADA, AVAX, DOGE, DOT, MATIC</p></div>';
+    updateCryptoCounter();
+    subscribeTop10Btn.disabled = false;
+    debugLog('Cleared all crypto data', 'info');
 });
 
 loadSavedCredentials();

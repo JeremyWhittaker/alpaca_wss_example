@@ -60,6 +60,7 @@
         <div class="tabs">
             <button class="tab-button active" data-tab="news">News Feed</button>
             <button class="tab-button" data-tab="stocks">Stock Data</button>
+            <button class="tab-button" data-tab="crypto">Crypto</button>
             <button class="tab-button" data-tab="debug">Debug Console</button>
         </div>
         
@@ -84,6 +85,25 @@
                     <div class="stocks-grid" id="stocksGrid">
                         <div class="stocks-placeholder">
                             <p>Stock symbols from news will automatically appear here with real-time price updates</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="cryptoTab">
+                <div class="crypto-container">
+                    <div class="crypto-header">
+                        <h3>Cryptocurrency Data</h3>
+                        <div class="crypto-info">
+                            <span id="cryptoCount">0 cryptos tracked</span>
+                            <button id="subscribeTop10Btn" class="btn btn-primary btn-small">Subscribe to Top 10 Crypto</button>
+                            <button id="clearCryptoBtn" class="btn btn-secondary btn-small">Clear All</button>
+                        </div>
+                    </div>
+                    <div class="crypto-grid" id="cryptoGrid">
+                        <div class="crypto-placeholder">
+                            <p>Click "Subscribe to Top 10 Crypto" to start tracking major cryptocurrencies by market cap</p>
+                            <p class="crypto-note">Includes: BTC, ETH, BNB, XRP, SOL, ADA, AVAX, DOGE, DOT, MATIC</p>
                         </div>
                     </div>
                 </div>
