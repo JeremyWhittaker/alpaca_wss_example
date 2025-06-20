@@ -22,10 +22,25 @@ A real-time web application that streams news and stock market data from Alpaca 
 - Volume tracking and spread calculations
 - Click any news symbol to add to watchlist
 
+### 💱 Cryptocurrency Tracking
+- Real-time crypto price updates for top 10 cryptocurrencies
+- Support for BTC, ETH, BNB, XRP, SOL, ADA, AVAX, DOGE, DOT, MATIC
+- 24-hour high/low tracking and volume display
+- One-click subscription to top 10 crypto by market cap
+- Live bid/ask spreads and trade updates
+
+### 🔑 Enhanced Credential Management
+- Multiple API key storage with custom names
+- Dropdown selection for saved API keys
+- Automatic secret loading when selecting saved keys
+- Auto-connect on startup with designated key
+- Delete saved keys functionality
+- Visual indicator for auto-connect enabled keys
+
 ### 🔧 Developer Features
 - Debug console with detailed WebSocket logging
-- Auto-connect on startup option
-- Secure credential storage in `.env` file
+- Multi-tab interface (News, Stocks, Crypto, Debug)
+- Secure credential storage in `credentials.json`
 - Docker containerization for easy deployment
 - Responsive design for all devices
 
@@ -55,6 +70,7 @@ A real-time web application that streams news and stock market data from Alpaca 
    - Get free API keys at https://alpaca.markets
    - Paper trading keys work for market data
    - Click "Save Credentials" to persist them
+   - Or select from previously saved keys in the dropdown
 
 ## Configuration
 
@@ -66,9 +82,11 @@ ALPACA_API_SECRET=your_api_secret_here
 PORT=9500
 ```
 
-### Auto-Connect Feature
-- Check "Auto-connect on startup" when saving credentials
-- The app will automatically connect next time you visit
+### Credential Management
+- **Multiple Keys**: Save multiple API keys with custom names
+- **Dropdown Selection**: Select from saved keys to auto-load credentials
+- **Auto-Connect**: Check "Auto-connect on startup" for any saved key
+- **Secure Storage**: Credentials stored in `credentials.json` (git-ignored)
 
 ## Usage
 
@@ -81,6 +99,7 @@ PORT=9500
 ### Navigation
 - **News Feed Tab**: View real-time market news
 - **Stock Data Tab**: Monitor live price updates
+- **Crypto Tab**: Track top 10 cryptocurrencies
 - **Debug Console Tab**: View WebSocket messages and troubleshoot
 
 ### Test Mode
@@ -104,6 +123,7 @@ PORT=9500
 ### Data Feeds
 - **News Feed**: `wss://stream.data.alpaca.markets/v1beta1/news`
 - **Stock Data**: `wss://stream.data.alpaca.markets/v2/iex` (IEX feed)
+- **Crypto Data**: `wss://stream.data.alpaca.markets/v1beta3/crypto/us`
 
 ## Development
 
@@ -133,11 +153,15 @@ alpaca-news-feed/
 - `disconnect`: Close Alpaca connections
 - `test_news`: Generate test news items
 - `add_symbol`: Add symbol to stock watchlist
+- `subscribe_top10_crypto`: Subscribe to top 10 cryptocurrencies
 
 #### Server → Client
 - `news`: New news article
 - `stock_trade`: Stock trade update
 - `stock_quote`: Bid/ask quote update
+- `crypto_trade`: Crypto trade update
+- `crypto_quote`: Crypto bid/ask update
+- `crypto_bar`: Crypto OHLCV data
 - `auth_success`: Authentication successful
 - `subscription_confirmed`: Successfully subscribed to data
 
@@ -164,8 +188,9 @@ docker logs alpaca-news-feed-alpaca-news-feed-1 -f
 - Free tier includes real-time data access
 
 ## Security Notes
-- API credentials are stored locally in `.env`
-- Never commit `.env` file to version control
+- API credentials are stored locally in `credentials.json` and `.env`
+- Never commit `.env` or `credentials.json` to version control
+- Both files are included in `.gitignore`
 - Use environment variables in production
 - Credentials are only transmitted over secure WebSocket (WSS)
 

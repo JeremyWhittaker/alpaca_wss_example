@@ -8,6 +8,9 @@ const saveBtn = document.getElementById('saveBtn');
 const testNewsBtn = document.getElementById('testNewsBtn');
 const apiKeyInput = document.getElementById('apiKey');
 const apiSecretInput = document.getElementById('apiSecret');
+const keyNameInput = document.getElementById('keyName');
+const savedKeysSelect = document.getElementById('savedKeys');
+const deleteKeyBtn = document.getElementById('deleteKeyBtn');
 const messageBox = document.getElementById('messageBox');
 const debugLogs = document.getElementById('debugLogs');
 const clearDebugBtn = document.getElementById('clearDebugBtn');
@@ -495,6 +498,7 @@ testNewsBtn.addEventListener('click', () => {
 saveBtn.addEventListener('click', async () => {
     const apiKey = apiKeyInput.value.trim();
     const apiSecret = apiSecretInput.value.trim();
+    const keyName = keyNameInput.value.trim();
     const autoConnect = autoConnectCheckbox.checked;
     
     if (!apiKey || !apiSecret) {
@@ -508,14 +512,15 @@ saveBtn.addEventListener('click', async () => {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ apiKey, apiSecret, autoConnect })
+            body: JSON.stringify({ apiKey, apiSecret, autoConnect, name: keyName })
         });
         
         const data = await response.json();
         
         if (response.ok) {
-            localStorage.setItem('autoConnect', autoConnect);
-            showMessage('Credentials saved successfully! They will be loaded automatically next time.', 'success');
+            showMessage('Credentials saved successfully!', 'success');
+            keyNameInput.value = '';
+            await loadSavedKeys();
         } else {
             showMessage(data.error || 'Failed to save credentials', 'error');
         }
@@ -525,29 +530,115 @@ saveBtn.addEventListener('click', async () => {
     }
 });
 
-async function loadSavedCredentials() {
+savedKeysSelect.addEventListener('change', async () => {
+    const selectedKey = savedKeysSelect.value;
+    
+    if (!selectedKey) {
+        apiKeyInput.value = '';
+        apiSecretInput.value = '';
+        autoConnectCheckbox.checked = false;
+        deleteKeyBtn.style.display = 'none';
+        return;
+    }
+    
+    deleteKeyBtn.style.display = 'inline-flex';
+    
+    try {
+        const response = await fetch(`/api/credentials/${selectedKey}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            apiKeyInput.value = data.apiKey;
+            apiSecretInput.value = data.apiSecret;
+            
+            // Check if this key is set for auto-connect
+            const credResponse = await fetch('/api/credentials');
+            const credData = await credResponse.json();
+            autoConnectCheckbox.checked = credData.autoConnect === selectedKey;
+            
+            showMessage('Credentials loaded from saved key', 'info');
+        } else {
+            showMessage('Failed to load saved key', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading saved key:', error);
+        showMessage('Failed to load saved key', 'error');
+    }
+});
+
+deleteKeyBtn.addEventListener('click', async () => {
+    const selectedKey = savedKeysSelect.value;
+    
+    if (!selectedKey) return;
+    
+    if (!confirm('Are you sure you want to delete this saved key?')) return;
+    
+    try {
+        const response = await fetch(`/api/credentials/${selectedKey}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showMessage('Key deleted successfully', 'success');
+            savedKeysSelect.value = '';
+            apiKeyInput.value = '';
+            apiSecretInput.value = '';
+            autoConnectCheckbox.checked = false;
+            deleteKeyBtn.style.display = 'none';
+            await loadSavedKeys();
+        } else {
+            showMessage('Failed to delete key', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting key:', error);
+        showMessage('Failed to delete key', 'error');
+    }
+});
+
+async function loadSavedKeys() {
     try {
         const response = await fetch('/api/credentials');
         const data = await response.json();
         
-        if (data.hasCredentials) {
-            apiKeyInput.value = data.apiKey;
-            apiSecretInput.value = data.apiSecret;
+        // Clear and populate dropdown
+        savedKeysSelect.innerHTML = '<option value="">Select a saved key or enter new credentials below</option>';
+        
+        if (data.keys && data.keys.length > 0) {
+            data.keys.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key.apiKey;
+                option.textContent = `${key.name} (${key.apiKeyDisplay})`;
+                if (data.autoConnect === key.apiKey) {
+                    option.textContent += ' [Auto-Connect]';
+                }
+                savedKeysSelect.appendChild(option);
+            });
             
-            const autoConnect = localStorage.getItem('autoConnect') === 'true';
-            autoConnectCheckbox.checked = autoConnect;
-            
-            if (autoConnect) {
-                showMessage('Auto-connecting with saved credentials...', 'info');
-                setTimeout(() => {
-                    connectBtn.click();
-                }, 1000);
-            } else {
-                showMessage(`Saved credentials loaded (${data.apiKey.substring(0, 8)}...). Click "Connect to News Feed" to start.`, 'info');
+            // If auto-connect is enabled, select that key and connect
+            if (data.autoConnect) {
+                const autoKey = data.keys.find(k => k.apiKey === data.autoConnect);
+                if (autoKey) {
+                    savedKeysSelect.value = data.autoConnect;
+                    
+                    // Load the credentials
+                    const credResponse = await fetch(`/api/credentials/${data.autoConnect}`);
+                    const credData = await credResponse.json();
+                    
+                    if (credResponse.ok) {
+                        apiKeyInput.value = credData.apiKey;
+                        apiSecretInput.value = credData.apiSecret;
+                        autoConnectCheckbox.checked = true;
+                        
+                        showMessage(`Auto-connecting with ${autoKey.name}...`, 'info');
+                        setTimeout(() => {
+                            connectBtn.click();
+                        }, 1000);
+                    }
+                }
             }
         }
     } catch (error) {
-        console.error('Error loading saved credentials:', error);
+        console.error('Error loading saved keys:', error);
     }
 }
 
@@ -699,6 +790,6 @@ clearCryptoBtn.addEventListener('click', () => {
     debugLog('Cleared all crypto data', 'info');
 });
 
-loadSavedCredentials();
+loadSavedKeys();
 shouldReconnect = true;
 connectWebSocket();

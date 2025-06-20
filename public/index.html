@@ -31,6 +31,19 @@
             
             <div class="api-inputs">
                 <div class="input-group">
+                    <label for="savedKeys">Saved Keys:</label>
+                    <select id="savedKeys" class="api-select">
+                        <option value="">Select a saved key or enter new credentials below</option>
+                    </select>
+                </div>
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+                <div class="input-group">
+                    <label for="keyName">Key Name (optional):</label>
+                    <input type="text" id="keyName" placeholder="e.g., Paper Trading Key" />
+                </div>
+                <div class="input-group">
                     <label for="apiKey">API Key:</label>
                     <input type="text" id="apiKey" placeholder="Enter your Alpaca API Key" />
                 </div>
@@ -41,7 +54,7 @@
                 <div class="input-group checkbox-group">
                     <label>
                         <input type="checkbox" id="autoConnect" />
-                        <span>Auto-connect on startup with saved credentials</span>
+                        <span>Auto-connect on startup with this key</span>
                     </label>
                 </div>
             </div>
@@ -50,6 +63,7 @@
                 <button id="connectBtn" class="btn btn-primary">Connect to News Feed</button>
                 <button id="disconnectBtn" class="btn btn-secondary" disabled>Disconnect</button>
                 <button id="saveBtn" class="btn btn-secondary">Save Credentials</button>
+                <button id="deleteKeyBtn" class="btn btn-secondary" style="display: none;">Delete Selected Key</button>
                 <button id="testNewsBtn" class="btn btn-secondary" disabled>Test News</button>
                 <button id="clearBtn" class="btn btn-secondary">Clear News</button>
             </div>

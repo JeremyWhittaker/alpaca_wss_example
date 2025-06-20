@@ -10,65 +10,168 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
+// Store multiple saved credentials
+const credentialsPath = path.join(__dirname, 'credentials.json');
+
+function loadCredentials() {
+    try {
+        if (fs.existsSync(credentialsPath)) {
+            return JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+        }
+    } catch (error) {
+        console.error('Error loading credentials:', error);
+    }
+    return { keys: [], autoConnect: null };
+}
+
+function saveCredentials(credentials) {
+    try {
+        fs.writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving credentials:', error);
+        return false;
+    }
+}
+
 app.post('/api/credentials', (req, res) => {
-    const { apiKey, apiSecret } = req.body;
+    const { apiKey, apiSecret, autoConnect, name } = req.body;
     
     if (!apiKey || !apiSecret) {
         return res.status(400).json({ error: 'API Key and Secret are required' });
     }
     
-    const envPath = path.join(__dirname, '.env');
-    let envContent = '';
+    const credentials = loadCredentials();
     
-    try {
-        if (fs.existsSync(envPath)) {
-            envContent = fs.readFileSync(envPath, 'utf8');
-        }
+    // Check if this key already exists
+    const existingIndex = credentials.keys.findIndex(k => k.apiKey === apiKey);
+    
+    const keyName = name || `Key ${apiKey.substring(0, 8)}...`;
+    const keyEntry = {
+        name: keyName,
+        apiKey: apiKey,
+        apiSecret: apiSecret,
+        addedAt: new Date().toISOString()
+    };
+    
+    if (existingIndex >= 0) {
+        // Update existing key
+        credentials.keys[existingIndex] = keyEntry;
+    } else {
+        // Add new key
+        credentials.keys.push(keyEntry);
+    }
+    
+    // Update auto-connect preference
+    if (autoConnect) {
+        credentials.autoConnect = apiKey;
+    } else if (credentials.autoConnect === apiKey) {
+        credentials.autoConnect = null;
+    }
+    
+    if (saveCredentials(credentials)) {
+        // Also update .env for backward compatibility
+        const envPath = path.join(__dirname, '.env');
+        let envContent = '';
         
-        const envLines = envContent.split('\n').filter(line => line.trim() !== '');
-        const envVars = {};
-        
-        envLines.forEach(line => {
-            const [key, ...valueParts] = line.split('=');
-            if (key && valueParts.length > 0) {
-                envVars[key.trim()] = valueParts.join('=').trim();
+        try {
+            if (fs.existsSync(envPath)) {
+                envContent = fs.readFileSync(envPath, 'utf8');
             }
-        });
-        
-        envVars['ALPACA_API_KEY'] = apiKey;
-        envVars['ALPACA_API_SECRET'] = apiSecret;
-        if (!envVars['PORT']) {
-            envVars['PORT'] = '9500';
+            
+            const envLines = envContent.split('\n').filter(line => line.trim() !== '');
+            const envVars = {};
+            
+            envLines.forEach(line => {
+                const [key, ...valueParts] = line.split('=');
+                if (key && valueParts.length > 0) {
+                    envVars[key.trim()] = valueParts.join('=').trim();
+                }
+            });
+            
+            envVars['ALPACA_API_KEY'] = apiKey;
+            envVars['ALPACA_API_SECRET'] = apiSecret;
+            if (!envVars['PORT']) {
+                envVars['PORT'] = '9500';
+            }
+            
+            const newEnvContent = Object.entries(envVars)
+                .map(([key, value]) => `${key}=${value}`)
+                .join('\n');
+            
+            fs.writeFileSync(envPath, newEnvContent);
+            
+            process.env.ALPACA_API_KEY = apiKey;
+            process.env.ALPACA_API_SECRET = apiSecret;
+        } catch (error) {
+            console.error('Error updating .env:', error);
         }
-        
-        const newEnvContent = Object.entries(envVars)
-            .map(([key, value]) => `${key}=${value}`)
-            .join('\n');
-        
-        fs.writeFileSync(envPath, newEnvContent);
-        
-        process.env.ALPACA_API_KEY = apiKey;
-        process.env.ALPACA_API_SECRET = apiSecret;
         
         res.json({ success: true, message: 'Credentials saved successfully' });
-    } catch (error) {
-        console.error('Error saving credentials:', error);
+    } else {
         res.status(500).json({ error: 'Failed to save credentials' });
     }
 });
 
 app.get('/api/credentials', (req, res) => {
-    const apiKey = process.env.ALPACA_API_KEY;
-    const apiSecret = process.env.ALPACA_API_SECRET;
+    const credentials = loadCredentials();
     
-    if (apiKey && apiSecret && apiKey !== 'your_api_key_here') {
-        res.json({ 
-            hasCredentials: true,
-            apiKey: apiKey,
-            apiSecret: apiSecret
+    // Also check .env for backward compatibility
+    const envKey = process.env.ALPACA_API_KEY;
+    const envSecret = process.env.ALPACA_API_SECRET;
+    
+    if (envKey && envSecret && envKey !== 'your_api_key_here') {
+        // Check if env key is already in saved credentials
+        const hasEnvKey = credentials.keys.some(k => k.apiKey === envKey);
+        if (!hasEnvKey) {
+            credentials.keys.push({
+                name: `Env Key ${envKey.substring(0, 8)}...`,
+                apiKey: envKey,
+                apiSecret: envSecret,
+                addedAt: new Date().toISOString()
+            });
+        }
+    }
+    
+    res.json({
+        keys: credentials.keys.map(k => ({
+            name: k.name,
+            apiKey: k.apiKey,
+            apiKeyDisplay: `${k.apiKey.substring(0, 8)}...`,
+            addedAt: k.addedAt
+        })),
+        autoConnect: credentials.autoConnect
+    });
+});
+
+app.get('/api/credentials/:apiKey', (req, res) => {
+    const { apiKey } = req.params;
+    const credentials = loadCredentials();
+    
+    const keyEntry = credentials.keys.find(k => k.apiKey === apiKey);
+    if (keyEntry) {
+        res.json({
+            apiKey: keyEntry.apiKey,
+            apiSecret: keyEntry.apiSecret
         });
     } else {
-        res.json({ hasCredentials: false });
+        res.status(404).json({ error: 'Key not found' });
+    }
+});
+
+app.delete('/api/credentials/:apiKey', (req, res) => {
+    const { apiKey } = req.params;
+    const credentials = loadCredentials();
+    
+    credentials.keys = credentials.keys.filter(k => k.apiKey !== apiKey);
+    if (credentials.autoConnect === apiKey) {
+        credentials.autoConnect = null;
+    }
+    
+    if (saveCredentials(credentials)) {
+        res.json({ success: true });
+    } else {
+        res.status(500).json({ error: 'Failed to delete credential' });
     }
 });
 
@@ -549,9 +652,12 @@ wss.on('connection', (ws) => {
     });
 });
 
-const envApiKey = process.env.ALPACA_API_KEY;
-const envApiSecret = process.env.ALPACA_API_SECRET;
-
-if (envApiKey && envApiSecret && envApiKey !== 'your_api_key_here') {
-    connectToAlpaca(envApiKey, envApiSecret);
+// Auto-connect if configured
+const credentials = loadCredentials();
+if (credentials.autoConnect) {
+    const keyEntry = credentials.keys.find(k => k.apiKey === credentials.autoConnect);
+    if (keyEntry) {
+        console.log(`Auto-connecting with saved key: ${keyEntry.name}`);
+        connectToAlpaca(keyEntry.apiKey, keyEntry.apiSecret);
+    }
 }

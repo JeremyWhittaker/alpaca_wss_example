@@ -133,7 +133,8 @@ h1 {
     font-size: 0.95rem;
 }
 
-.input-group input {
+.input-group input,
+.input-group select {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -143,7 +144,8 @@ h1 {
     transition: all 0.3s ease;
 }
 
-.input-group input:focus {
+.input-group input:focus,
+.input-group select:focus {
     outline: none;
     border-color: #667eea;
     background: rgba(255, 255, 255, 0.1);
@@ -152,6 +154,42 @@ h1 {
 
 .input-group input::placeholder {
     color: rgba(255, 255, 255, 0.4);
+}
+
+.api-select {
+    width: 100%;
+    cursor: pointer;
+}
+
+.api-select option {
+    background: #1a1a2e;
+    color: #ffffff;
+}
+
+.divider {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.divider span {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0 20px;
+    position: relative;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .button-group {
