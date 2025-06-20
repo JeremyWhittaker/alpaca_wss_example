@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  alpaca-news-feed:
+    build: .
+    ports:
+      - "9500:9500"
+    environment:
+      - PORT=9500
+    env_file:
+      - .env
+    restart: unless-stopped

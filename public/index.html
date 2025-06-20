@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpaca News Feed</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Alpaca News Feed</h1>
+            <div class="status-indicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+                <span class="news-count" id="newsCount"></span>
+            </div>
+        </header>
+        
+        <div class="control-panel" id="controlPanel">
+            <h2>Getting Started</h2>
+            <div class="instructions">
+                <p>To start receiving real-time news from Alpaca:</p>
+                <ol>
+                    <li>Enter your Alpaca API credentials below</li>
+                    <li>Click "Connect to News Feed"</li>
+                    <li>News will start streaming automatically</li>
+                </ol>
+            </div>
+            
+            <div class="api-inputs">
+                <div class="input-group">
+                    <label for="apiKey">API Key:</label>
+                    <input type="text" id="apiKey" placeholder="Enter your Alpaca API Key" />
+                </div>
+                <div class="input-group">
+                    <label for="apiSecret">API Secret:</label>
+                    <input type="password" id="apiSecret" placeholder="Enter your Alpaca API Secret" />
+                </div>
+                <div class="input-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="autoConnect" />
+                        <span>Auto-connect on startup with saved credentials</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="connectBtn" class="btn btn-primary">Connect to News Feed</button>
+                <button id="disconnectBtn" class="btn btn-secondary" disabled>Disconnect</button>
+                <button id="saveBtn" class="btn btn-secondary">Save Credentials</button>
+                <button id="testNewsBtn" class="btn btn-secondary" disabled>Test News</button>
+                <button id="clearBtn" class="btn btn-secondary">Clear News</button>
+            </div>
+            
+            <div class="message-box" id="messageBox"></div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-button active" data-tab="news">News Feed</button>
+            <button class="tab-button" data-tab="stocks">Stock Data</button>
+            <button class="tab-button" data-tab="debug">Debug Console</button>
+        </div>
+        
+        <main>
+            <div class="tab-content active" id="newsTab">
+                <div class="news-container" id="newsContainer">
+                    <div class="news-placeholder">
+                        <p>Enter your API credentials above and click "Connect to News Feed" to start</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="stocksTab">
+                <div class="stocks-container">
+                    <div class="stocks-header">
+                        <h3>Real-Time Stock Data</h3>
+                        <div class="stocks-info">
+                            <span id="stocksCount">0 stocks tracked</span>
+                            <button id="clearStocksBtn" class="btn btn-secondary btn-small">Clear All</button>
+                        </div>
+                    </div>
+                    <div class="stocks-grid" id="stocksGrid">
+                        <div class="stocks-placeholder">
+                            <p>Stock symbols from news will automatically appear here with real-time price updates</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="debugTab">
+                <div class="debug-console" id="debugConsole">
+                    <div class="debug-header">
+                        <h3>Debug Console</h3>
+                        <button id="clearDebugBtn" class="btn btn-secondary btn-small">Clear</button>
+                    </div>
+                    <div class="debug-logs" id="debugLogs"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
